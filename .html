@@ -2936,8 +2936,9 @@ function assembleAndCompileOS(files) {
 
     const bootAsmKey = Object.keys(files).find(f => f === "boot.asm" || f.endsWith(".asm") || f.endsWith(".s"));
     const bootAsm = bootAsmKey ? files[bootAsmKey] : "";
-    const kernelC = files["kernel.c"] || "";
-    const displayC = files["display.c"] || "";
+    const kernelC = files["kernel.c"] || files["kernel.cpp"] || "";
+    const displayC = files["display.c"] || files["memory.c"] || files["fs.c"] || "";
+    const rustSource = files["main.rs"] || files["lib.rs"] || "";
     const linkerLd = files["linker.ld"] || "";
 
     // 1. Parser & Assembler x86 (Real Mode / Boot Sector)
@@ -3245,7 +3246,7 @@ function assembleAndCompileOS(files) {
         return new Uint8Array(payload);
     }
 
-    const fullCCode = (kernelC + "\n" + displayC).trim();
+    const fullCCode = (kernelC + "\n" + displayC + "\n" + rustSource).trim();
     if (fullCCode) {
         const compiledKernel = compileCToX86(fullCCode);
         for (let i = 0; i < Math.min(1024, compiledKernel.length); i++) {
@@ -3323,8 +3324,12 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
     const activeType = currentFileName ? getFileType(currentFileName) : "";
     const activeContent = (currentFileName && files[currentFileName]) ? files[currentFileName] : "";
 
-        const isOSProject = Object.keys(files).some(f => f === "boot.asm" || f === "kernel.c" || f === "display.c" || f.endsWith(".asm") || f.endsWith(".s"));
-    if (!html && (isOSProject || activeType === "asm" || activeType === "c")) {
+        const osFileKeywords = ["boot.asm", "kernel.c", "kernel.cpp", "display.c", "linker.ld", "main.rs", "makefile", "cmakelists.txt"];
+        const isOSProject = Object.keys(files).some(f => {
+            const lower = f.toLowerCase();
+            return osFileKeywords.includes(lower) || lower.endsWith(".asm") || lower.endsWith(".s") || lower.endsWith(".iso") || lower.endsWith(".img") || lower.endsWith(".ld");
+        });
+        if (!html && (isOSProject || ["asm", "c", "cpp", "rust", "makefile", "osimage", "ld"].includes(activeType))) {
         const buildRes = assembleAndCompileOS(files);
         const imgArray = Array.from(buildRes.image);
         const escapedImgData = JSON.stringify(imgArray);
@@ -4147,9 +4152,9 @@ builtins.input = custom_input
 `;
 
     if(html.includes("<head>")){ 
-        html = html.replace("<head>", "<head>" + runtimeErrorInterceptorScript + visualEditorScript); 
+        html = html.replace("<head>", "<head>" + visualEditorScript);
     } else { 
-        html = runtimeErrorInterceptorScript + visualEditorScript + html; 
+        html = visualEditorScript + html;
     }
 
     const previewFrame = document.getElementById("previewFrame");
@@ -4189,8 +4194,7 @@ window.addEventListener("message", function(event) {
     } 
 
     if (event.data.type === 'preview-runtime-error') {
-        const errorData = event.data;
-        handleRuntimeAppError(errorData);
+        // Deteccion automatica de errores de la WEB desactivada por requerimiento
         return;
     }
 }); 
@@ -7284,7 +7288,10 @@ projects.forEach(project => {
   
 function getFileType(filename){  
     if (!filename) return "file";
+    const lowerName = filename.toLowerCase();
+    if (lowerName === "makefile" || lowerName.endsWith(".mk") || lowerName === "cmakelists.txt" || lowerName.endsWith(".cmake")) return "makefile";
     const ext = filename.split(".").pop().toLowerCase();  
+    if (ext === "iso" || ext === "img" || ext === "bin") return "osimage";
   
     if (ext === "html" || ext === "htm") return "html";  
     if (ext === "js" || ext === "mjs" || ext === "cjs") return "js";  
@@ -7344,6 +7351,8 @@ function getFileIcon(filename){
     if (type === "image") return `🖼️`;  
     if (type === "audio") return `🎵`;  
     if (type === "video") return `🎬`;  
+    if (type === "makefile") return `<span style="color:#eab308; font-weight:bold;">🛠️ Build</span>`;
+    if (type === "osimage") return `<span style="color:#ef4444; font-weight:bold;">💿 Disk</span>`;
     if (type === "archive") return `📦`;  
   
     return `📄`;  
@@ -7817,6 +7826,8 @@ function renderSyntaxHighlighting() {
     else if (ext === "c") grammarName = "c";
     else if (ext === "cpp" || ext === "cc" || ext === "hpp") grammarName = "cpp";
     else if (ext === "rust" || ext === "rs") grammarName = "rust";
+    else if (ext === "ld") grammarName = "c";
+    else if (ext === "makefile") grammarName = "bash";
     else if (ext === "go") grammarName = "go";
     else if (ext === "java") grammarName = "java";
     else if (ext === "csharp" || ext === "cs") grammarName = "csharp";
@@ -8609,6 +8620,35 @@ void draw_vga_banner() {
     }
 }
 `,
+            "display.h": `/* Encabezados del Controlador de Pantalla y VGA */
+#ifndef DISPLAY_H
+#define DISPLAY_H
+
+void clear_screen();
+void print_string(const char* str, char color);
+void draw_vga_banner();
+
+#endif
+`,
+            "main.rs": `/* Kernel Secundario / Módulo Rust para Kernel x86 */
+#![no_std]
+#![no_main]
+
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    let vga_buffer = 0xb8000 as *mut u8;
+    unsafe {
+        *vga_buffer = b"R";
+        *vga_buffer.offset(1) = 0x0A;
+    }
+    loop {}
+}
+`,
             "linker.ld": `ENTRY(start)
 SECTIONS
 {
@@ -8617,6 +8657,34 @@ SECTIONS
     .data : { *(.data) }
     .bss  : { *(.bss) }
 }
+`,
+            "Makefile": `# Makefile para Compilación del Sistema Operativo
+CC = gcc
+NASM = nasm
+LD = ld
+
+all: os_image.img
+
+os_image.img: boot.bin kernel.bin
+	cat boot.bin kernel.bin > os_image.img
+
+boot.bin: boot.asm
+	$(NASM) -f bin boot.asm -o boot.bin
+
+kernel.bin: kernel.c display.c
+	$(CC) -ffreestanding -c kernel.c display.c
+	$(LD) -o kernel.bin -T linker.ld kernel.o display.o --oformat binary
+
+clean:
+	rm -f *.bin *.o *.img *.iso
+`,
+            "CMakeLists.txt": `# CMake Build Config para MIWY Kernel OS
+cmake_minimum_required(VERSION 3.10)
+project(MiwyOS C CXX ASM)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffreestanding -nostdlib -m32")
+add_executable(kernel.bin kernel.c display.c)
+set_target_properties(kernel.bin PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/linker.ld")
 `
         } : {
             "index.html": `<!DOCTYPE html>
@@ -9318,8 +9386,8 @@ function runProjectDiagnostics() {
             }
         }
 
-        // 4. Análisis y Linter de C (.c)
-        if (fileType === "c") {
+        // 4. Análisis y Linter de C/C++/Rust (.c, .cpp, .rs)
+        if (fileType === "c" || fileType === "cpp" || fileType === "rust") {
             const openBraces = (content.match(/\{/g) || []).length;
             const closeBraces = (content.match(/\}/g) || []).length;
             if (openBraces !== closeBraces) {
