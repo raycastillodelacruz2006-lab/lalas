@@ -2932,16 +2932,6 @@ function updatePreview() {
 ===================================================== */
 function assembleAndCompileOS(files) {
     const errors = [];
-    if (typeof runProjectDiagnostics === "function") {
-        const issues = runProjectDiagnostics();
-        if (issues && issues.length > 0) {
-            issues.forEach(iss => {
-                if (iss.type === "error") {
-                    errors.push(`[${iss.file}:${iss.line}] ${iss.message}`);
-                }
-            });
-        }
-    }
     const image = new Uint8Array(1474560); // Imagen Floppy 1.44 MB
 
     const bootAsmKey = Object.keys(files).find(f => f === "boot.asm" || f.endsWith(".asm") || f.endsWith(".s"));
