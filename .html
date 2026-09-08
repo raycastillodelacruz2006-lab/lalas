@@ -5245,14 +5245,10 @@ function replaceAllMatches() {
                     <div class="code-footer">  
                         <span id="fileFooterName" style="display:none;">Sin archivo</span>  
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <button id="toggleWordWrapBtn" class="preview-button" onclick="toggleWordWrap()" style="height:22px; padding:0 8px; font-size:10px; color:#aaa;" title="Ajuste de línea (Word Wrap)">↩ Wrap</button>
-                            <button id="zoomOutEditorBtn" class="preview-button" onclick="changeEditorFontSize(-1)" style="height:22px; padding:0 6px; font-size:10px; color:#aaa;" title="Reducir letra">A-</button>
-                            <button id="zoomInEditorBtn" class="preview-button" onclick="changeEditorFontSize(1)" style="height:22px; padding:0 6px; font-size:10px; color:#aaa;" title="Aumentar letra">A+</button>
-                            <button id="autoCorrectBtn" class="preview-button" onclick="lintAndFixCurrentCode()" style="height:22px; padding:0 8px; font-size:10px; color:var(--orange); gap:4px;" title="Analizar y corregir errores de sintaxis y formato">✨ Corregir</button>
                             <button id="copyCodeBtn" class="preview-button" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Copiar código al portapapeles">📋 Copiar</button>
+                            <button id="pasteCodeBtn" class="preview-button" onclick="pasteCodeToEditor()" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Pegar código desde el portapapeles">📋 Pegar</button>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <span id="editorSaveStatus" style="font-size:10px; color:#42d66b;">● Guardado</span>
                             <span id="lineCounter" class="editor-position">Ln 1, Col 1</span>  
                         </div>
                     </div>  
@@ -9483,6 +9479,30 @@ if (mobilePreview) {
 }
   
   
+/* =====================================================
+   PEGAR CÓDIGO
+===================================================== */
+function pasteCodeToEditor() {
+    if (!codeEditor || codeEditor.disabled) return;
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+            if (text) {
+                const start = codeEditor.selectionStart || 0;
+                const end = codeEditor.selectionEnd || 0;
+                const val = codeEditor.value;
+                codeEditor.value = val.substring(0, start) + text + val.substring(end);
+                codeEditor.selectionStart = codeEditor.selectionEnd = start + text.length;
+                saveCurrentFile();
+                if (typeof updateLineCounter === "function") updateLineCounter();
+                if (typeof renderSyntaxHighlighting === "function") renderSyntaxHighlighting();
+                if (typeof updatePreview === "function") updatePreview();
+            }
+        }).catch(err => {
+            console.warn("Clipboard paste error:", err);
+        });
+    }
+}
+
 /* =====================================================  
    COPIAR CÓDIGO  
 ===================================================== */  
