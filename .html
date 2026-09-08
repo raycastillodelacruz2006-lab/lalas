@@ -2918,7 +2918,7 @@ function updatePreview() {
     clearTimeout(updatePreviewTimer);
     const sequence = ++previewUpdateSequence;
     const editorSize = typeof codeEditor !== "undefined" && codeEditor ? codeEditor.value.length : 0;
-    const previewDelay = editorSize > 100000 ? 600 : (editorSize > 50000 ? 350 : (editorSize > 10000 ? 150 : 80));
+    const previewDelay = editorSize > 100000 ? 200 : (editorSize > 50000 ? 100 : 30);
     updatePreviewTimer = setTimeout(() => {
         if (sequence !== previewUpdateSequence) return;
         syncEditorToProject();
@@ -3127,31 +3127,7 @@ builtins.input = custom_input
 </body>
 </html>`;
         } else {
-            const escapedCode = JSON.stringify(activeContent);
-            html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<style>
-  body { background: #080c10; color: #42d66b; font-family: Consolas, monospace; padding: 20px; margin: 0; box-sizing: border-box; }
-  #app-view { width: 100%; height: 100%; white-space: pre-wrap; }
-</style>
-</head>
-<body>
-  <div id="app-view"></div>
-  <script>
-    (function() {
-      const container = document.getElementById("app-view");
-      try {
-        container.textContent = ${escapedCode};
-      } catch (err) {
-        container.style.color = "#ff4d4d";
-        container.textContent = "❌ Error: " + String(err);
-      }
-    })();
-  <\/script>
-</body>
-</html>`;
+            html = "";
         }
     }
 
