@@ -3349,11 +3349,16 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
   .status-bar { margin-top: 10px; color: #a1a1aa; font-size: 12px; width: 720px; max-width: 100%; display: flex; justify-content: space-between; }
 </style>
 <script src="https://copy.sh/v86/build/v86_all.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/v86@latest/build/v86_all.js"><\/script>
 </head>
 <body>
   <div class="v86-header">
     <span>💻 Emulador x86 (v86) - <strong>${escapeHTML(currentFileName || "sistema.bin")}</strong></span>
-    <span class="badge-v86">BIOS & x86 Hardware</span>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button onclick="focusEmulator()" style="background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-weight: bold;">⌨️ Enfocar Teclado</button>
+      <button onclick="restartEmulator()" style="background: #1e293b; color: #f59e0b; border: 1px solid #d97706; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-weight: bold;">🔄 Reiniciar SO</button>
+      <span class="badge-v86">BIOS & x86 Hardware</span>
+    </div>
   </div>
 
   <div id="screen_container">
@@ -3379,16 +3384,32 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
           // Keep text container visible for v86 BIOS & VGA text mode
           txtOut.textContent = "";
           var emulator = new V86Starter({
-              wasm_path: "https://copy.sh/v86/build/v86.wasm",
+              wasm_path: "https://cdn.jsdelivr.net/npm/v86@latest/build/v86.wasm",
               memory_size: 32 * 1024 * 1024,
               vga_memory_size: 2 * 1024 * 1024,
               screen_container: document.getElementById("screen_container"),
               fda: {
                   url: binaryUrl,
               },
-              autostart: true
+              autostart: true,
+              bios: { url: "https://cdn.jsdelivr.net/npm/v86@latest/bios/seabios.bin" },
+              vga_bios: { url: "https://cdn.jsdelivr.net/npm/v86@latest/bios/vgabios.bin" }
           });
           statusEl.textContent = "✅ Emulador v86 iniciado correctamente con sistema.bin";
+          window.focusEmulator = function() {
+            window.focus();
+            const sc = document.getElementById("screen_container");
+            if (sc) sc.focus();
+            statusEl.textContent = "⌨️ Teclado capturado por el emulador x86";
+          };
+          window.restartEmulator = function() {
+            if (emulator && emulator.restart) {
+              emulator.restart();
+              statusEl.textContent = "🔄 Sistema Operativo reiniciado";
+            }
+          };
+          document.addEventListener("click", window.focusEmulator);
+          setTimeout(window.focusEmulator, 300);
         } catch (err) {
           txtOut.style.display = "block";
           txtOut.textContent = "❌ Error al iniciar V86Starter: " + String(err);
@@ -8589,6 +8610,7 @@ dw 0xAA55
 void kernel_main() {
     clear_screen();
     print_string("Miwy Kernel x86 Inicializado Correctamente!\n", 0x0F);
+    print_string("MIWY OS> Presiona Enter o escribe en el teclado...\n", 0x0E);
     draw_vga_banner();
 }
 `,
