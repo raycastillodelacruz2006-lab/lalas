@@ -2932,6 +2932,16 @@ function updatePreview() {
 ===================================================== */
 function assembleAndCompileOS(files) {
     const errors = [];
+    if (typeof runProjectDiagnostics === "function") {
+        const issues = runProjectDiagnostics();
+        if (issues && issues.length > 0) {
+            issues.forEach(iss => {
+                if (iss.type === "error") {
+                    errors.push(`[${iss.file}:${iss.line}] ${iss.message}`);
+                }
+            });
+        }
+    }
     const image = new Uint8Array(1474560); // Imagen Floppy 1.44 MB
 
     const bootAsmKey = Object.keys(files).find(f => f === "boot.asm" || f.endsWith(".asm") || f.endsWith(".s"));
@@ -3361,8 +3371,8 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
     </div>
   </div>
 
-  <div id="screen_container">
-    <div id="v86_text_output">▶ Compilando sistema.bin y arrancando emulador x86 v86...</div>
+  <div id="screen_container" tabindex="0" style="outline: none;">
+    <div id="v86_text_output">▶ Iniciando pipeline de compilación de SO...</div>
     <canvas style="display: none;"></canvas>
   </div>
 
@@ -3399,8 +3409,11 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
           window.focusEmulator = function() {
             window.focus();
             const sc = document.getElementById("screen_container");
-            if (sc) sc.focus();
-            statusEl.textContent = "⌨️ Teclado capturado por el emulador x86";
+            if (sc) {
+              sc.focus();
+              if (emulator && emulator.keyboard_set_status) emulator.keyboard_set_status(true);
+            }
+            statusEl.textContent = "⌨️ Teclado capturado por el emulador x86 (Enter, Letras, Números, Backspace habilitados)";
           };
           window.restartEmulator = function() {
             if (emulator && emulator.restart) {
